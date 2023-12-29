@@ -1,3 +1,4 @@
 {
+  "plugins": ["@typescript-eslint"],
   "extends": "next/core-web-vitals"
 }
