@@ -83,7 +83,6 @@ export type CustomError =
   | ShortUrlNotAsciiAlphanumeric
   | ReserveObsolete
   | ElevationGroupAlreadyActivated
-  | ObligationInDeprecatedReserve
 
 export class InvalidMarketAuthority extends Error {
   static readonly code = 6000
@@ -1042,17 +1041,6 @@ export class ElevationGroupAlreadyActivated extends Error {
   }
 }
 
-export class ObligationInDeprecatedReserve extends Error {
-  static readonly code = 6084
-  readonly code = 6084
-  readonly name = "ObligationInDeprecatedReserve"
-  readonly msg = "Obligation has a deposit in a deprecated reserve"
-
-  constructor(readonly logs?: string[]) {
-    super("6084: Obligation has a deposit in a deprecated reserve")
-  }
-}
-
 export function fromCode(code: number, logs?: string[]): CustomError | null {
   switch (code) {
     case 6000:
@@ -1223,8 +1211,6 @@ export function fromCode(code: number, logs?: string[]): CustomError | null {
       return new ReserveObsolete(logs)
     case 6083:
       return new ElevationGroupAlreadyActivated(logs)
-    case 6084:
-      return new ObligationInDeprecatedReserve(logs)
   }
 
   return null

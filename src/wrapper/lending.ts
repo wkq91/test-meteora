@@ -1,48 +1,269 @@
 // There are three levels of data you can request (and cache) about the lending market.
 
-import { rpcUrl } from "@/config";
-import { KaminoMarket } from "@hubbleprotocol/kamino-lending-sdk";
-import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import { mainnetRpcUrl, trader } from "@/config";
+import { LendingMarket } from "@/gen/kamino_lending/accounts";
+import {
+  KaminoAction,
+  KaminoMarket,
+  PROGRAM_ID,
+  VanillaObligation,
+  sendTransactionV0,
+} from "@hubbleprotocol/kamino-lending-sdk";
+import { Kamino } from "@hubbleprotocol/kamino-sdk";
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  sendAndConfirmTransaction,
+} from "@solana/web3.js";
 import base58 from "bs58";
+import { getChainAmount } from "./utils";
 
-export async function readMarketData() {
-  const connection = new Connection(rpcUrl);
+export async function queryUserObligation() {
+  const connection = new Connection(mainnetRpcUrl);
 
-  // 1. Initalize market with parameters and metadata
   const market = await KaminoMarket.load(
     connection,
-    new PublicKey("ABPeWVeRuvii6HuzTYcp1iH5a3ELfeVEviCtm3GfNnLV") // main market address. Defaults to 'Main' market
+    new PublicKey("7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF") // main market address. Defaults to 'Main' market
   );
 
   if (!market) {
     return;
   }
 
-  console.log(
-    market.reserves.map((reserve) => reserve.config.loanToValueRatio)
-  );
-
   // 2. Refresh on-chain accounts for reserve data and cache
   await market.loadReserves();
 
-  const usdcReserve = market.getReserve("USDC");
-  console.log(usdcReserve?.stats.totalDepositsWads.toString());
-
-  // Read Kamino Lending liquidity mining stats
-  // await market.loadRewards();
-  // console.log(reserve.stats.totalSupplyAPY().rewards); // {apy: 0.07, rewardMint: "SLND...
-
   // Refresh all cached data
-  market.refreshAll();
+  //   market.refreshAll();
 
-  const obligation = market.fetchObligationByWallet("[WALLET_ID]");
-  console.log(obligation.stats.borrowLimit);
+  const obligation = await market.getObligationByWallet(
+    trader.publicKey,
+    new VanillaObligation(PROGRAM_ID)
+  );
+  console.log({ obligation });
+
+  if (!obligation) {
+    return;
+  }
+
+  console.log(
+    "allowedBorrowValueSf:",
+    obligation?.state?.allowedBorrowValueSf?.toString()
+  );
+
+  const deposits = obligation?.deposits;
+  deposits?.forEach((deposit) => {
+    const amount = deposit.amount;
+    console.log("deposit amount:", amount.toString());
+  });
+
+  const borrows = obligation?.borrows;
+  borrows?.forEach((borrow) => {
+    console.log("borrow amount:", borrow.amount.toString());
+    console.log("borrow mint:", borrow.mintAddress.toString());
+  });
+
+  return obligation;
 }
 
-export async function sendDeposit() {
-  const trader = Keypair.fromSecretKey(
-    base58.decode(
-      "RRj5FcZv9zLno2XB6tfsAd8SHM9t7bZ1ofPc2ijp8zm1dMRW2UpsRapPRvUq7wXtrDJYxbUnaUF2YBmATZQ3RPt"
-    )
+export async function testKaminoSdk() {
+  const connection = new Connection(mainnetRpcUrl);
+  const kamino = new Kamino("mainnet-beta", connection);
+
+  // get all strategies supported by Kamino
+  const strategies = await kamino.getStrategies();
+  console.log({ strategies });
+}
+
+export async function sendSupply(symbol: string) {
+  const connection = new Connection(mainnetRpcUrl);
+  // 1. Initalize market with parameters and metadata
+  const market = await KaminoMarket.load(
+    connection,
+    new PublicKey("7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF") // main market address. Defaults to 'Main' market
   );
+
+  if (!market) {
+    return;
+  }
+
+  await market.loadReserves();
+
+  const reserveMint = market.getReserveMintBySymbol(symbol);
+  console.log("reserveMint:", reserveMint?.toString());
+
+  if (!reserveMint) {
+    console.error("Can not find symbol mint");
+    return;
+  }
+
+  const action = await KaminoAction.buildDepositTxns(
+    market,
+    getChainAmount(0.01, symbol) + "",
+    reserveMint,
+    trader.publicKey,
+    new VanillaObligation(PROGRAM_ID)
+  );
+
+  const hash = await action.sendTransactions(
+    async (transaction, connection) => {
+      const txId = await sendAndConfirmTransaction(
+        connection,
+        transaction,
+        [trader],
+        {
+          commitment: "confirmed",
+        }
+      );
+      console.log({ txId });
+      return txId;
+    }
+  );
+
+  return hash;
+}
+
+export async function sendWithdraw(symbol: string) {
+  const connection = new Connection(mainnetRpcUrl);
+  // 1. Initalize market with parameters and metadata
+  const market = await KaminoMarket.load(
+    connection,
+    new PublicKey("7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF") // main market address. Defaults to 'Main' market
+  );
+
+  if (!market) {
+    return;
+  }
+
+  await market.loadReserves();
+
+  const reserveMint = market.getReserveMintBySymbol(symbol);
+  console.log("reserveMint:", reserveMint?.toString());
+
+  if (!reserveMint) {
+    console.error("Can not find symbol mint");
+    return;
+  }
+
+  const action = await KaminoAction.buildWithdrawTxns(
+    market,
+    getChainAmount(0.01, symbol) + "",
+    reserveMint,
+    trader.publicKey,
+    new VanillaObligation(PROGRAM_ID)
+  );
+
+  const hash = await action.sendTransactions(
+    async (transaction, connection) => {
+      const txId = await sendAndConfirmTransaction(
+        connection,
+        transaction,
+        [trader],
+        {
+          commitment: "confirmed",
+        }
+      );
+      console.log({ txId });
+      return txId;
+    }
+  );
+
+  return hash;
+}
+
+export async function sendBorrow(symbol: string, amount = 0.1) {
+  const connection = new Connection(mainnetRpcUrl);
+  // 1. Initalize market with parameters and metadata
+  const market = await KaminoMarket.load(
+    connection,
+    new PublicKey("7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF") // main market address. Defaults to 'Main' market
+  );
+
+  if (!market) {
+    return;
+  }
+
+  await market.loadReserves();
+
+  const reserveMint = market.getReserveMintBySymbol(symbol);
+  console.log("reserveMint:", reserveMint?.toString());
+
+  if (!reserveMint) {
+    console.error("Can not find symbol mint");
+    return;
+  }
+
+  const action = await KaminoAction.buildBorrowTxns(
+    market,
+    getChainAmount(amount, symbol) + "",
+    reserveMint,
+    trader.publicKey,
+    new VanillaObligation(PROGRAM_ID)
+  );
+
+  const hash = await action.sendTransactions(
+    async (transaction, connection) => {
+      const txId = await sendAndConfirmTransaction(
+        connection,
+        transaction,
+        [trader],
+        {
+          commitment: "confirmed",
+        }
+      );
+      console.log({ txId });
+      return txId;
+    }
+  );
+
+  return hash;
+}
+
+export async function sendRepay(symbol: string, amount = 0.1) {
+  const connection = new Connection(mainnetRpcUrl);
+  // 1. Initalize market with parameters and metadata
+  const market = await KaminoMarket.load(
+    connection,
+    new PublicKey("7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF") // main market address. Defaults to 'Main' market
+  );
+
+  if (!market) {
+    return;
+  }
+
+  await market.loadReserves();
+
+  const reserveMint = market.getReserveMintBySymbol(symbol);
+  console.log("reserveMint:", reserveMint?.toString());
+
+  if (!reserveMint) {
+    console.error("Can not find symbol mint");
+    return;
+  }
+
+  const action = await KaminoAction.buildRepayTxns(
+    market,
+    getChainAmount(amount, symbol) + "",
+    reserveMint,
+    trader.publicKey,
+    new VanillaObligation(PROGRAM_ID)
+  );
+
+  const hash = await action.sendTransactions(
+    async (transaction, connection) => {
+      const txId = await sendAndConfirmTransaction(
+        connection,
+        transaction,
+        [trader],
+        {
+          commitment: "confirmed",
+        }
+      );
+      console.log({ txId });
+      return txId;
+    }
+  );
+
+  return hash;
 }

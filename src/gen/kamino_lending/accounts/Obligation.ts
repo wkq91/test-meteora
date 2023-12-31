@@ -38,7 +38,6 @@ export interface ObligationFields {
   borrowsAssetTiers: Array<number>
   /** The elevation group id the obligation opted into. */
   elevationGroup: number
-  numOfObsoleteReserves: number
   reserved: Array<number>
   /** Wallet address of the referrer */
   referrer: PublicKey
@@ -79,7 +78,6 @@ export interface ObligationJSON {
   borrowsAssetTiers: Array<number>
   /** The elevation group id the obligation opted into. */
   elevationGroup: number
-  numOfObsoleteReserves: number
   reserved: Array<number>
   /** Wallet address of the referrer */
   referrer: string
@@ -121,7 +119,6 @@ export class Obligation {
   readonly borrowsAssetTiers: Array<number>
   /** The elevation group id the obligation opted into. */
   readonly elevationGroup: number
-  readonly numOfObsoleteReserves: number
   readonly reserved: Array<number>
   /** Wallet address of the referrer */
   readonly referrer: PublicKey
@@ -147,8 +144,7 @@ export class Obligation {
     borsh.array(borsh.u8(), 8, "depositsAssetTiers"),
     borsh.array(borsh.u8(), 5, "borrowsAssetTiers"),
     borsh.u8("elevationGroup"),
-    borsh.u8("numOfObsoleteReserves"),
-    borsh.array(borsh.u8(), 1, "reserved"),
+    borsh.array(borsh.u8(), 2, "reserved"),
     borsh.publicKey("referrer"),
     borsh.array(borsh.u64(), 128, "padding3"),
   ])
@@ -174,7 +170,6 @@ export class Obligation {
     this.depositsAssetTiers = fields.depositsAssetTiers
     this.borrowsAssetTiers = fields.borrowsAssetTiers
     this.elevationGroup = fields.elevationGroup
-    this.numOfObsoleteReserves = fields.numOfObsoleteReserves
     this.reserved = fields.reserved
     this.referrer = fields.referrer
     this.padding3 = fields.padding3
@@ -247,7 +242,6 @@ export class Obligation {
       depositsAssetTiers: dec.depositsAssetTiers,
       borrowsAssetTiers: dec.borrowsAssetTiers,
       elevationGroup: dec.elevationGroup,
-      numOfObsoleteReserves: dec.numOfObsoleteReserves,
       reserved: dec.reserved,
       referrer: dec.referrer,
       padding3: dec.padding3,
@@ -272,7 +266,6 @@ export class Obligation {
       depositsAssetTiers: this.depositsAssetTiers,
       borrowsAssetTiers: this.borrowsAssetTiers,
       elevationGroup: this.elevationGroup,
-      numOfObsoleteReserves: this.numOfObsoleteReserves,
       reserved: this.reserved,
       referrer: this.referrer.toString(),
       padding3: this.padding3.map((item) => item.toString()),
@@ -302,7 +295,6 @@ export class Obligation {
       depositsAssetTiers: obj.depositsAssetTiers,
       borrowsAssetTiers: obj.borrowsAssetTiers,
       elevationGroup: obj.elevationGroup,
-      numOfObsoleteReserves: obj.numOfObsoleteReserves,
       reserved: obj.reserved,
       referrer: new PublicKey(obj.referrer),
       padding3: obj.padding3.map((item) => new BN(item)),
