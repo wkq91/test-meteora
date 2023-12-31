@@ -47,7 +47,7 @@ export default function Home() {
               }
             }}
           >
-            Supply SOL
+            Supply 0.01 SOL
           </button>
 
           <button
@@ -59,7 +59,7 @@ export default function Home() {
               }
             }}
           >
-            Withdraw SOL
+            Withdraw 0.01 SOL
           </button>
 
           <div className="flex">
@@ -72,7 +72,7 @@ export default function Home() {
                 }
               }}
             >
-              Borrow USDC
+              Borrow 0.1 USDC
             </button>
 
             <button
@@ -84,7 +84,7 @@ export default function Home() {
                 }
               }}
             >
-              Repay USDC
+              Repay 0.1 USDC
             </button>
           </div>
 
@@ -98,7 +98,7 @@ export default function Home() {
                 }
               }}
             >
-              Borrow bSOL
+              Borrow 0.001 bSOL
             </button>
 
             <button
@@ -110,7 +110,7 @@ export default function Home() {
                 }
               }}
             >
-              Repay bSOL
+              Repay 0.001 bSOL
             </button>
           </div>
 
@@ -125,7 +125,7 @@ export default function Home() {
               }
             }}
           >
-            Deposit in JitoSOL-SOL
+            Deposit in Raydium SOL-USDC
           </button>
 
           <button
@@ -137,7 +137,7 @@ export default function Home() {
               }
             }}
           >
-            Withdraw from JitoSOL-SOL
+            Withdraw from Raydium SOL-USDC
           </button>
         </div>
 

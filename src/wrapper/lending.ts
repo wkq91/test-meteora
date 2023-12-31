@@ -77,6 +77,7 @@ export async function testKaminoSdk() {
 }
 
 export async function sendSupply(symbol: string) {
+  console.log("Start Supply");
   const connection = new Connection(mainnetRpcUrl);
   // 1. Initalize market with parameters and metadata
   const market = await KaminoMarket.load(
@@ -125,6 +126,8 @@ export async function sendSupply(symbol: string) {
 }
 
 export async function sendWithdraw(symbol: string) {
+  console.log("Start Withdraw");
+
   const connection = new Connection(mainnetRpcUrl);
   // 1. Initalize market with parameters and metadata
   const market = await KaminoMarket.load(
@@ -173,6 +176,8 @@ export async function sendWithdraw(symbol: string) {
 }
 
 export async function sendBorrow(symbol: string, amount = 0.1) {
+  console.log("Start Borrow");
+
   const connection = new Connection(mainnetRpcUrl);
   // 1. Initalize market with parameters and metadata
   const market = await KaminoMarket.load(
@@ -221,6 +226,8 @@ export async function sendBorrow(symbol: string, amount = 0.1) {
 }
 
 export async function sendRepay(symbol: string, amount = 0.1) {
+  console.log("Start Repay");
+
   const connection = new Connection(mainnetRpcUrl);
   // 1. Initalize market with parameters and metadata
   const market = await KaminoMarket.load(

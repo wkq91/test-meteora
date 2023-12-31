@@ -244,7 +244,7 @@ export async function depositLiquidityShares() {
 
   console.log(`Transaction: https://explorer.solana.com/tx/${txid}`);
 
-  return;
+  return txid;
 
   const requests1 = depositInstructions.map((i) => {
     return (async () => {
