@@ -2,35 +2,9 @@ This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next
 
 ## Getting Started
 
-First, run the development server:
+1. 主要会用到两个库 `@hubbleprotocol/kamino-lending-sdk` 和 `@hubbleprotocol/kamino-sdk`，`@hubbleprotocol/kamino-lending-sdk` 主要
+   负责 DApp 里面的 Borrow/Lend, Long/Short, Multiply 模块，`@hubbleprotocol/kamino-sdk` 主要负责 Liquidity 模块
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+2. `@hubbleprotocol/kamino-lending-sdk` 目前通过这个库实现了 Borrow/Lend 里面的操作(对应代码在 `lending.ts`)，这个库没找到 github 仓库，只在 npm 主页找到了一些文档，示例代码还是错的，需要用我在 `lending.ts` 里边用的方法来发交易，初始化 market 对象
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+3. `@hubbleprotocol/kamino-sdk` 通过这个库实现了 Liquidity 里面的操作(`liquidity.ts`)，这个发交易主要是需要 Pool Address 和 对应的 Strategy Address，SDK 和 kamino 提供的 open Api 里面都有对应的方法，例如 `getRaydiumPoolsForTokens` `https://api.hubbleprotocol.io/strategies/enabled?env=mainnet-beta`，我测试用的 `SOL-USDC` Raydium Pool，偶尔发成功过一两次交易，大部分是失败，还得找下原因
