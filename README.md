@@ -30,7 +30,9 @@ This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next
 
 3. `@hubbleprotocol/kamino-sdk` 我通过这个库实现了 Liquidity 里面的操作(`liquidity.ts`)，这个发交易只需要 Strategy Address，就可以构造对应的 deposit 操作
 
-测试发现有个坑:Pool 里面的两个 token 假如 decimal 不一样（例如 SOL-USDC），就会失败，后面测试 bSOL-SOL 的 Pool 成功了(https://app.kamino.finance/liquidity/7ypH9hpQ6fLRXCVdK9Zb6zSgUvzFp44EN7PWfWdUBDb5)，应该是 SDK 里面处理 decimal 有问题
+测试发现有个坑:Pool 里面的两个 token 假如 decimal 不一样（例如 SOL-USDC），就会失败，后面测试 bSOL-SOL 的 Pool 成功了(https://app.kamino.finance/liquidity/7ypH9hpQ6fLRXCVdK9Zb6zSgUvzFp44EN7PWfWdUBDb5)
+
+应该是 SDK 里面处理 decimal 有问题
 
 ```
    //  初始化
