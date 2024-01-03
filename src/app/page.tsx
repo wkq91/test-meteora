@@ -8,7 +8,9 @@ import {
 } from "@/wrapper/lending";
 import {
   depositLiquidityShares,
+  depositToStrategy,
   queryLiquidityPools,
+  singleSidedDepositToStrategy,
   withdrawLiquidityShares,
 } from "@/wrapper/liquidity";
 import { useEffect, useState } from "react";
@@ -119,14 +121,27 @@ export default function Home() {
           <button
             className="mt-5 p-2 border-solid border-gray-50 border-[1px] rounded-sm"
             onClick={async () => {
-              const hash = await depositLiquidityShares();
-              if (hash) {
-                setTxids([hash, ...txids]);
-              }
+              // const hash = await depositLiquidityShares();
+              // if (hash) {
+              //   setTxids([hash, ...txids]);
+              // }
+              depositToStrategy();
+              // singleSidedDepositToStrategy();
             }}
           >
-            Deposit in Raydium SOL-USDC
+            Deposit in Orca bSOL-SOL
           </button>
+
+          <div className="break-all mt-1">
+            Deposit 0.01 SOL and about 0.0098 bSOL into{" "}
+            <a
+              href="https://app.kamino.finance/liquidity/7ypH9hpQ6fLRXCVdK9Zb6zSgUvzFp44EN7PWfWdUBDb5"
+              target="_blank"
+              className="text-red-500 underline"
+            >
+              https://app.kamino.finance/liquidity/7ypH9hpQ6fLRXCVdK9Zb6zSgUvzFp44EN7PWfWdUBDb5
+            </a>
+          </div>
 
           <button
             className="mt-5 p-2 border-solid border-gray-50 border-[1px] rounded-sm"
@@ -137,7 +152,7 @@ export default function Home() {
               }
             }}
           >
-            Withdraw from Raydium SOL-USDC
+            Withdraw all shares from Orca bSOL-SOL
           </button>
         </div>
 

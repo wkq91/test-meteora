@@ -28,7 +28,9 @@ This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next
 
 ```
 
-3. `@hubbleprotocol/kamino-sdk` 我通过这个库实现了 Liquidity 里面的操作(`liquidity.ts`)，这个发交易主要是需要 Pool Address 和 对应的 Strategy Address，SDK 和 kamino 提供的 open Api 里面都有对应的方法，例如 `getRaydiumPoolsForTokens` `https://api.hubbleprotocol.io/strategies/enabled?env=mainnet-beta`，我测试用的 `SOL-USDC` Raydium Pool，偶尔发成功过一两次交易，大部分是失败，还得找下原因
+3. `@hubbleprotocol/kamino-sdk` 我通过这个库实现了 Liquidity 里面的操作(`liquidity.ts`)，这个发交易只需要 Strategy Address，就可以构造对应的 deposit 操作
+
+测试发现有个坑:Pool 里面的两个 token 假如 decimal 不一样（例如 SOL-USDC），就会失败，后面测试 bSOL-SOL 的 Pool 成功了(https://app.kamino.finance/liquidity/7ypH9hpQ6fLRXCVdK9Zb6zSgUvzFp44EN7PWfWdUBDb5)，应该是 SDK 里面处理 decimal 有问题
 
 ```
    //  初始化
@@ -38,11 +40,17 @@ This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next
    ...
    ...
 
-   // 构造单Token Deposit的交易
-   const depositIx = await kamino.singleSidedDepositTokenA(
-    matchedStrategy,
-    new Decimal(0.01),
-    trader.publicKey,
-    new Decimal(50)
+   // 构造单Deposit的交易
+    let depositIx = await kamino.deposit(
+    new PublicKey(stragegyAddress),
+    amounts[0],
+    new Decimal(Number(amounts[1]) * 1),
+    trader.publicKey
+  );
+
+  // 构造withdraw全部share的交易
+  const withdrawIx = await kamino.withdrawAllShares(
+    strategyWithAddres,
+    trader.publicKey
   );
 ```

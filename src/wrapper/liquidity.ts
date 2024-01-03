@@ -1,28 +1,28 @@
 // There are three levels of data you can request (and cache) about the lending market.
 
 import { mainnetRpcUrl, trader } from "@/config";
-import {
-  KaminoAction,
-  KaminoMarket,
-  PROGRAM_ID,
-  VanillaObligation,
-} from "@hubbleprotocol/kamino-lending-sdk";
+import { getAssociatedTokenAddress } from "@hubbleprotocol/kamino-lending-sdk";
 import {
   Kamino,
-  StrategyWithAddress,
   assignBlockInfoToTransaction,
+  collToLamportsDecimal,
   createTransactionWithExtraBudget,
   getAssociatedTokenAddressAndData,
+  isSOLMint,
+  sendTransactionWithLogs,
 } from "@hubbleprotocol/kamino-sdk";
+import { NATIVE_MINT } from "@solana/spl-token";
 import {
-  AddressLookupTableAccount,
+  TOKEN_PROGRAM_ID,
+  createCloseAccountInstruction,
+  createSyncNativeInstruction,
+} from "@solana/spl-token03";
+import {
   Connection,
   PublicKey,
-  TransactionMessage,
-  VersionedTransaction,
+  SystemProgram,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
-import { getChainAmount } from "./utils";
 import Decimal from "decimal.js";
 
 export async function queryLiquidityPools() {
@@ -56,117 +56,70 @@ export async function queryLiquidityPools() {
   console.log({ pool });
 }
 
-export async function depositLiquidityShares() {
+export async function depositToStrategy(amount: number = 0.01) {
+  console.log("1111");
+
   const connection = new Connection(mainnetRpcUrl);
   const kamino = new Kamino("mainnet-beta", connection);
 
-  const orcaPools = await kamino.getOrcaPoolsForTokens(
-    new PublicKey("So11111111111111111111111111111111111111112"),
-    new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
+  // SOL-USDC Raydium
+  // const stragegyAddress = "CEz5keL9hBCUbtVbmcwenthRMwmZLupxJ6YtYAgzp4ex";
+  // https://app.kamino.finance/liquidity/7ypH9hpQ6fLRXCVdK9Zb6zSgUvzFp44EN7PWfWdUBDb5
+  const stragegyAddress = "7ypH9hpQ6fLRXCVdK9Zb6zSgUvzFp44EN7PWfWdUBDb5";
+
+  const strategyState = await kamino.getStrategyByAddress(
+    new PublicKey(stragegyAddress)
   );
-  const raydiumPools = await kamino.getRaydiumPoolsForTokens(
-    new PublicKey("So11111111111111111111111111111111111111112"),
-    new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
-  );
 
-  console.log({ orcaPools });
-  console.log({ raydiumPools });
-
-  orcaPools.sort((item1, item2) => {
-    return Number(item2.tvl) - Number(item1.tvl);
-  });
-
-  raydiumPools.sort((item1, item2) => {
-    return Number(item2.tvl) - Number(item1.tvl);
-  });
-
-  const orcaFirstPool = orcaPools.length > 0 ? orcaPools[0] : null;
-  const raydiumFirstPool = raydiumPools.length > 0 ? raydiumPools[0] : null;
-
-  let finalPoolAddress =
-    Number(orcaFirstPool?.tvl) > Number(raydiumFirstPool?.tvl)
-      ? orcaFirstPool?.address
-      : raydiumFirstPool?.id;
-  console.log({ finalPoolAddress });
-  finalPoolAddress = "2QdhepnKRTLjjSqPL1PtKNwqrUkoLee5Gqs8bvZhRdMv";
-
-  // const pool = await kamino.getWhirlpoolByAddress(
-  //   new PublicKey(finalPoolAddress || "")
-  // );
-  const pool = await kamino.getRaydiumPoolByAddress(
-    new PublicKey(finalPoolAddress || "")
-  );
-  if (!pool) {
-    console.error("pool not found");
+  if (!strategyState) {
+    console.error("strategy is null");
     return;
   }
 
-  console.log(pool.tokenMint0.toString());
-  console.log(pool.tokenMint1.toString());
-
-  // const allStrategies = await kamino.getStrategies();
-  // const matchedStrategy = allStrategies.find(
-  //   (item) => item?.pool.toString() === poolAddress
-  // );
-
-  const strategiesRes = await fetch(
-    "https://api.hubbleprotocol.io/strategies/enabled?env=mainnet-beta"
-  );
-  const apiStrategies = await strategiesRes.json();
-  const matchedApiStrategies = apiStrategies.filter((item: any) => {
-    return (
-      item.tokenAMint === pool.tokenMint0.toString() &&
-      item.tokenBMint === pool.tokenMint1.toString()
-    );
-  });
-  console.log({ matchedApiStrategies });
-
-  let matchedStrategy: StrategyWithAddress | null = null;
-  for (let i = 0; i < matchedApiStrategies.length; i++) {
-    const st = await kamino.getStrategyByKTokenMint(
-      new PublicKey(matchedApiStrategies[i].shareMint)
-    );
-    console.log({ st });
-    console.log("st pool", st?.strategy.pool.toString());
-    if (st?.strategy.pool.toString() === finalPoolAddress) {
-      matchedStrategy = st;
-      break;
-    }
-  }
-
-  console.log({ matchedStrategy });
+  console.log("tokenAMint", strategyState.tokenAMint.toString());
+  console.log("tokenBMint", strategyState.tokenBMint.toString());
   console.log(
-    "strategy sharesMint:",
-    matchedStrategy?.strategy.sharesMint.toString()
+    "tokenAMintDecimals",
+    strategyState.tokenAMintDecimals.toString()
+  );
+  console.log(
+    "tokenBMintDecimals",
+    strategyState.tokenBMintDecimals.toString()
   );
 
-  if (!matchedStrategy) {
-    console.error("matchedApiStrategy not found");
-    return;
-  }
+  let amounts = await kamino.calculateAmountsToBeDeposited(
+    new PublicKey(stragegyAddress),
+    new Decimal(0.01)
+  );
 
-  // check if associated token addresses exist for token A, B and shares
+  console.log("amounts 0", amounts[0].toString());
+  console.log("amounts 1", amounts[1].toString());
+
+  let tx = createTransactionWithExtraBudget(12000000);
   const [sharesAta, sharesMintData] = await getAssociatedTokenAddressAndData(
     connection,
-    matchedStrategy.strategy.sharesMint,
+    strategyState.sharesMint,
     trader.publicKey
   );
   const [tokenAAta, tokenAData] = await getAssociatedTokenAddressAndData(
     connection,
-    matchedStrategy.strategy.tokenAMint,
+    strategyState.tokenAMint,
     trader.publicKey
   );
   const [tokenBAta, tokenBData] = await getAssociatedTokenAddressAndData(
     connection,
-    matchedStrategy.strategy.tokenBMint,
+    strategyState.tokenBMint,
     trader.publicKey
   );
 
-  // add creation of associated token addresses to the transaction instructions if they don't exist
+  let strategyWithAddres = {
+    address: new PublicKey(stragegyAddress),
+    strategy: strategyState,
+  };
   const ataInstructions =
     await kamino.getCreateAssociatedTokenAccountInstructionsIfNotExist(
       trader.publicKey,
-      matchedStrategy,
+      strategyWithAddres,
       tokenAData,
       tokenAAta,
       tokenBData,
@@ -174,216 +127,135 @@ export async function depositLiquidityShares() {
       sharesMintData,
       sharesAta
     );
+  if (ataInstructions.length > 0) {
+    tx.add(...ataInstructions);
+  } else {
+    console.log("ataInstructions empty");
+  }
 
-  // create a transaction that has an instruction for extra compute budget (deposit operation needs this),
-  // let tx1 = createTransactionWithExtraBudget();
-  // if (ataInstructions.length > 0) {
-  //   tx1.add(...ataInstructions);
-  // }
-
-  // assign block hash, block height and fee payer to the transaction
-  // tx1 = await assignBlockInfoToTransaction(connection, tx1, trader.publicKey);
-  // const txHash1 = await sendAndConfirmTransaction(connection, tx1, [trader], {
-  //   commitment: "confirmed",
-  // });
-  // console.log({ txHash1 });
-
-  // specify amount of token A and B to deposit:
-  // const depositIx = await kamino.deposit(
-  //   matchedStrategy,
-  //   new Decimal(0),
-  //   new Decimal(0.1),
-  //   trader.publicKey
-  // );
-  // tx2.add(depositIx);
-
-  const depositIx = await kamino.singleSidedDepositTokenA(
-    matchedStrategy,
-    new Decimal(0.01),
-    trader.publicKey,
-    new Decimal(50)
+  const associatedTokenAccount = await getAssociatedTokenAddress(
+    NATIVE_MINT,
+    trader.publicKey
   );
-  // const depositIx = await kamino.singleSidedDepositTokenB(
-  //   matchedStrategy,
-  //   new Decimal(0.1),
-  //   trader.publicKey,
-  //   new Decimal(50)
-  // );
+  const closeAccountIx = createCloseAccountInstruction(
+    associatedTokenAccount,
+    trader.publicKey,
+    trader.publicKey,
+    [],
+    TOKEN_PROGRAM_ID
+  );
 
-  const lookupTableRequests: AddressLookupTableAccount[] =
-    depositIx.lookupTablesAddresses.map((address) => {
-      return (async () => {
-        const lookupTableAccount = (
-          await connection.getAddressLookupTable(address)
-        ).value;
-        return lookupTableAccount;
-      })();
-    });
+  // Add wSOL if mint SOL
+  if (
+    isSOLMint(strategyState.tokenAMint) ||
+    isSOLMint(strategyState.tokenBMint)
+  ) {
+    let wSOLAmount = isSOLMint(strategyState.tokenAMint)
+      ? collToLamportsDecimal(
+          amounts[0],
+          strategyState.tokenAMintDecimals.toNumber()
+        )
+      : collToLamportsDecimal(
+          amounts[1],
+          strategyState.tokenBMintDecimals.toNumber()
+        );
 
-  const lookupTableAccounts = await Promise.all(lookupTableRequests);
+    tx.add(
+      // trasnfer SOL
+      SystemProgram.transfer({
+        fromPubkey: trader.publicKey,
+        toPubkey: associatedTokenAccount,
+        lamports: BigInt(wSOLAmount.floor().toString()),
+      }),
+      createSyncNativeInstruction(associatedTokenAccount)
+    );
+  }
 
-  const latestBlockHash = await connection.getLatestBlockhash();
+  // Create Accounts, add wSOL balances
+  let createAtasRes = await sendTransactionWithLogs(
+    connection,
+    tx,
+    trader.publicKey,
+    [trader]
+  );
+  console.log(`createAtas Transaction: https://solana.fm/tx/${createAtasRes}`);
 
-  const depositInstructions = [...depositIx.instructions];
+  let depositIx = await kamino.deposit(
+    new PublicKey(stragegyAddress),
+    amounts[0],
+    new Decimal(Number(amounts[1]) * 1),
+    trader.publicKey
+  );
 
-  // construct a v0 compatible transaction `Message`
-  const messageV0 = new TransactionMessage({
-    payerKey: trader.publicKey,
-    recentBlockhash: latestBlockHash.blockhash,
-    instructions: [...ataInstructions, ...depositInstructions], // note this is an array of instructions
-  }).compileToV0Message(lookupTableAccounts);
+  let depositTx = createTransactionWithExtraBudget(1200000);
+  depositTx.add(depositIx);
+  // close wSOL account
+  depositTx.add(closeAccountIx);
 
-  // create a v0 transaction from the v0 message
-  const transactionV0 = new VersionedTransaction(messageV0);
+  depositTx = await assignBlockInfoToTransaction(
+    connection,
+    depositTx,
+    trader.publicKey
+  );
 
-  // sign the v0 transaction using the file system wallet we created named `payer`
-  transactionV0.sign([trader]);
-  // send and confirm the transaction
-  // (NOTE: There is NOT an array of Signers here; see the note below...)
-  const txid = await connection.sendTransaction(transactionV0);
+  const txHash = await sendAndConfirmTransaction(
+    connection,
+    depositTx,
+    [trader],
+    {
+      commitment: "processed",
+      skipPreflight: true,
+    }
+  );
 
-  console.log(`Transaction: https://explorer.solana.com/tx/${txid}`);
+  console.log(`deposit Transaction: https://solana.fm/tx/${txHash}`);
 
-  return txid;
-
-  const requests1 = depositInstructions.map((i) => {
-    return (async () => {
-      // construct a v0 compatible transaction `Message`
-      const messageV0 = new TransactionMessage({
-        payerKey: trader.publicKey,
-        recentBlockhash: latestBlockHash.blockhash,
-        instructions: [i], // note this is an array of instructions
-      }).compileToV0Message(lookupTableAccounts);
-
-      // create a v0 transaction from the v0 message
-      const transactionV0 = new VersionedTransaction(messageV0);
-
-      // sign the v0 transaction using the file system wallet we created named `payer`
-      transactionV0.sign([trader]);
-      // send and confirm the transaction
-      // (NOTE: There is NOT an array of Signers here; see the note below...)
-      const txid = await connection.sendTransaction(transactionV0);
-
-      console.log(`Transaction: https://explorer.solana.com/tx/${txid}`);
-    })();
-  });
-
-  await Promise.all(requests1);
-
-  return;
+  return txHash;
 }
 
 export async function withdrawLiquidityShares() {
   const connection = new Connection(mainnetRpcUrl);
   const kamino = new Kamino("mainnet-beta", connection);
 
-  const orcaPools = await kamino.getOrcaPoolsForTokens(
-    new PublicKey("So11111111111111111111111111111111111111112"),
-    new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
-  );
-  const raydiumPools = await kamino.getRaydiumPoolsForTokens(
-    new PublicKey("So11111111111111111111111111111111111111112"),
-    new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
+  // https://app.kamino.finance/liquidity/7ypH9hpQ6fLRXCVdK9Zb6zSgUvzFp44EN7PWfWdUBDb5
+  const stragegyAddress = "7ypH9hpQ6fLRXCVdK9Zb6zSgUvzFp44EN7PWfWdUBDb5";
+
+  const strategyState = await kamino.getStrategyByAddress(
+    new PublicKey(stragegyAddress)
   );
 
-  console.log({ orcaPools });
-  console.log({ raydiumPools });
-
-  orcaPools.sort((item1, item2) => {
-    return Number(item2.tvl) - Number(item1.tvl);
-  });
-
-  raydiumPools.sort((item1, item2) => {
-    return Number(item2.tvl) - Number(item1.tvl);
-  });
-
-  const orcaFirstPool = orcaPools.length > 0 ? orcaPools[0] : null;
-  const raydiumFirstPool = raydiumPools.length > 0 ? raydiumPools[0] : null;
-
-  let finalPoolAddress =
-    Number(orcaFirstPool?.tvl) > Number(raydiumFirstPool?.tvl)
-      ? orcaFirstPool?.address
-      : raydiumFirstPool?.id;
-  console.log({ finalPoolAddress });
-  finalPoolAddress = "2QdhepnKRTLjjSqPL1PtKNwqrUkoLee5Gqs8bvZhRdMv";
-
-  // const pool = await kamino.getWhirlpoolByAddress(
-  //   new PublicKey(finalPoolAddress || "")
-  // );
-  const pool = await kamino.getRaydiumPoolByAddress(
-    new PublicKey(finalPoolAddress || "")
-  );
-  if (!pool) {
-    console.error("pool not found");
-    return;
-  }
-
-  console.log(pool.tokenMint0.toString());
-  console.log(pool.tokenMint1.toString());
-
-  // const allStrategies = await kamino.getStrategies();
-  // const matchedStrategy = allStrategies.find(
-  //   (item) => item?.pool.toString() === poolAddress
-  // );
-
-  const strategiesRes = await fetch(
-    "https://api.hubbleprotocol.io/strategies/enabled?env=mainnet-beta"
-  );
-  const apiStrategies = await strategiesRes.json();
-  const matchedApiStrategies = apiStrategies.filter((item: any) => {
-    return (
-      item.tokenAMint === pool.tokenMint0.toString() &&
-      item.tokenBMint === pool.tokenMint1.toString()
-    );
-  });
-  console.log({ matchedApiStrategies });
-
-  let matchedStrategy: StrategyWithAddress | null = null;
-  for (let i = 0; i < matchedApiStrategies.length; i++) {
-    const st = await kamino.getStrategyByKTokenMint(
-      new PublicKey(matchedApiStrategies[i].shareMint)
-    );
-    console.log({ st });
-    console.log("st pool", st?.strategy.pool.toString());
-    if (st?.strategy.pool.toString() === finalPoolAddress) {
-      matchedStrategy = st;
-      break;
-    }
-  }
-
-  console.log({ matchedStrategy });
-  console.log(
-    "strategy sharesMint:",
-    matchedStrategy?.strategy.sharesMint.toString()
-  );
-
-  if (!matchedStrategy) {
-    console.error("matchedApiStrategy not found");
+  if (!strategyState) {
+    console.error("strategy not found");
     return;
   }
 
   // check if associated token addresses exist for token A, B and shares
   const [sharesAta, sharesMintData] = await getAssociatedTokenAddressAndData(
     connection,
-    matchedStrategy.strategy.sharesMint,
+    strategyState.sharesMint,
     trader.publicKey
   );
   const [tokenAAta, tokenAData] = await getAssociatedTokenAddressAndData(
     connection,
-    matchedStrategy.strategy.tokenAMint,
+    strategyState.tokenAMint,
     trader.publicKey
   );
   const [tokenBAta, tokenBData] = await getAssociatedTokenAddressAndData(
     connection,
-    matchedStrategy.strategy.tokenBMint,
+    strategyState.tokenBMint,
     trader.publicKey
   );
+
+  let strategyWithAddres = {
+    address: new PublicKey(stragegyAddress),
+    strategy: strategyState,
+  };
 
   // add creation of associated token addresses to the transaction instructions if they don't exist
   const ataInstructions =
     await kamino.getCreateAssociatedTokenAccountInstructionsIfNotExist(
       trader.publicKey,
-      matchedStrategy,
+      strategyWithAddres,
       tokenAData,
       tokenAAta,
       tokenBData,
@@ -392,42 +264,46 @@ export async function withdrawLiquidityShares() {
       sharesAta
     );
 
-  const withdrawIx = await kamino.withdrawShares(
-    matchedStrategy,
-    new Decimal(0.01),
-    trader.publicKey
-  );
-  // const withdrawIx = await kamino.withdrawAllShares(
-  //   matchedStrategy,
+  // const withdrawIx = await kamino.withdrawShares(
+  //   strategyWithAddres,
+  //   new Decimal(0.2),
   //   trader.publicKey
   // );
+  const withdrawIx = await kamino.withdrawAllShares(
+    strategyWithAddres,
+    trader.publicKey
+  );
+
   if (!withdrawIx) {
     console.error("withdrawIx empty");
     return;
   }
 
-  const latestBlockHash = await connection.getLatestBlockhash();
-  // construct a v0 compatible transaction `Message`
-  const messageV0 = new TransactionMessage({
-    payerKey: trader.publicKey,
-    recentBlockhash: latestBlockHash.blockhash,
-    instructions: [
-      ...ataInstructions,
-      // ...withdrawIx.prerequisiteIxs,
-      withdrawIx.withdrawIx,
-    ], // note this is an array of instructions
-  }).compileToV0Message();
+  let withdrawTx = createTransactionWithExtraBudget(1200000);
+  if (ataInstructions.length > 0) {
+    withdrawTx.add(...ataInstructions);
+  }
+  if (withdrawIx.prerequisiteIxs.length > 0) {
+    withdrawTx.add(...withdrawIx.prerequisiteIxs);
+  }
+  withdrawTx.add(withdrawIx.withdrawIx);
 
-  // create a v0 transaction from the v0 message
-  const transactionV0 = new VersionedTransaction(messageV0);
+  withdrawTx = await assignBlockInfoToTransaction(
+    connection,
+    withdrawTx,
+    trader.publicKey
+  );
 
-  // sign the v0 transaction using the file system wallet we created named `payer`
-  transactionV0.sign([trader]);
-  // send and confirm the transaction
-  // (NOTE: There is NOT an array of Signers here; see the note below...)
-  const txid = await connection.sendTransaction(transactionV0);
+  const txHash = await sendAndConfirmTransaction(
+    connection,
+    withdrawTx,
+    [trader],
+    {
+      commitment: "processed",
+      skipPreflight: true,
+    }
+  );
+  console.log(`withdraw Transaction: https://solana.fm/tx/${txHash}`);
 
-  console.log(`Transaction: https://explorer.solana.com/tx/${txid}`);
-
-  return txid;
+  return txHash;
 }
