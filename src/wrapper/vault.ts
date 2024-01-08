@@ -80,6 +80,8 @@ export async function depositToVault(
     commitment: "confirmed",
   });
   console.log(`deposit Transaction: https://solana.fm/tx/${txId}`);
+
+  return txId;
 }
 
 export async function withdrawFromVault(symbol: string, affiliateId?: string) {
@@ -136,8 +138,6 @@ export async function withdrawFromVault(symbol: string, affiliateId?: string) {
     new BN(userLpBalance)
   );
 
-  console.log({ tx });
-
   let { blockhash } = await connection.getLatestBlockhash();
   tx.recentBlockhash = blockhash;
   tx.feePayer = trader.publicKey;
@@ -146,4 +146,6 @@ export async function withdrawFromVault(symbol: string, affiliateId?: string) {
     commitment: "confirmed",
   });
   console.log(`withdraw Transaction: https://solana.fm/tx/${txId}`);
+
+  return txId;
 }
