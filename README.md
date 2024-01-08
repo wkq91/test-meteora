@@ -1,10 +1,4 @@
-# Mercurial Vault SDK
-
-<p align="center">
-<img align="center" src="https://vaults.mercurial.finance/icons/logo.svg" width="180" height="180" />
-</p>
 <br>
-
 <hr>
 
 ## Install
